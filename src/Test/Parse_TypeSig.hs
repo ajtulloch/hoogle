@@ -1,11 +1,24 @@
 
-module Test.Parse_TypeSig(parse_TypeSig) where
+module Test.Parse_TypeSig(parse_TypeSig, parse_RustTypeSig) where
 
 import Test.General
 import Data.Maybe
 import Hoogle.Type.All
 import Hoogle.Query.All
 
+parse_RustTypeSig :: IO ()
+parse_RustTypeSig = do
+    let parseTypeSig x = either Left (Right . fromMaybe (error $ "Couldn't find type in: " ++ x) . typeSig) $ parseQueryRust x
+    let (===) = parseTest parseTypeSig
+    
+    "(int, int) -> T" === TypeSig [] (TFun [TApp (TLit "(,)") [TLit "int", TLit "int"], TVar "T"])
+    "(int, int) -> int" === TypeSig [] (TFun [TApp (TLit "(,)") [TLit "int", TLit "int"], TLit "int"])
+    "(T, T) -> S" === TypeSig [] (TFun [TApp (TLit "(,)") [TVar "T", TVar "T"], TVar "S"])
+    "(T, T) -> S" === TypeSig [] (TFun [TApp (TLit "(,)") [TVar "T", TVar "T"], TVar "S"])
+    "(&T, T) -> AS" === TypeSig [] (TFun [TApp (TLit "(,)") [TVar "T", TVar "T"], TLit "AS"])
+    "(&int, &int) -> T" === TypeSig [] (TFun [TApp (TLit "(,)") [TLit "int", TLit "int"], TVar "T"])
+    "(T, int) -> Vec<T>" === TypeSig [] (TFun [TApp (TLit "(,)") [TVar "T", TLit "int"], TApp (TLit "Vec") [TVar "T"]])
+    "(T, int) -> Vec<T, S>" === TypeSig [] (TFun [TApp (TLit "(,)") [TVar "T", TLit "int"], TApp (TLit "Vec") [TVar "T", TVar "S"]])
 
 parse_TypeSig :: IO ()
 parse_TypeSig = do
@@ -14,6 +27,7 @@ parse_TypeSig = do
 
     -- really basic stuff
     "a" === TypeSig [] (TVar "a")
+    "(int, int) -> int" === TypeSig [] (TFun [TApp (TLit "(,)") [TVar "int", TVar "int"], TVar "int"])
     "a_" === TypeSig [] (TVar "a_")
     "_" === TypeSig [] (TVar "_")
     "_a" === TypeSig [] (TVar "_a")

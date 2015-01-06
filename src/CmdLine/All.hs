@@ -42,7 +42,7 @@ cmdLineExpand x@Search{} = do
                                    if exact x
                                    then Just UnclassifiedItem
                                    else Nothing })
-                   `fmap` parseQuery Haskell s
+                   `fmap` parseQuery Rust s
                , databases = db
                }
     where s = unwords $ queryChunks x

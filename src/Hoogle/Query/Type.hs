@@ -34,7 +34,7 @@ data Category = Module | Package deriving (Data,Typeable,Show,Eq)
 -- | Given a query, return the list of packages that should be searched. Each package will be
 --   the name of a database, without any file path or extension included.
 queryDatabases :: Query -> [String]
-queryDatabases q = if null ps then ["default"] else ps
+queryDatabases q = if null ps then ["default", "rust"] else ps
     where ps = [p | Scope True Package p <- scope q]
 
 

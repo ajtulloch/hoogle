@@ -12,15 +12,15 @@ import Hoogle
 actionSearch :: CmdLine -> Query -> IO ()
 actionSearch flags q = do
     (missing,dbs) <- loadQueryDatabases (databases flags) q
-    unless (null missing) $ do
-        n <- availableDatabases (databases flags)
-        exitMessage $
-            ("Could not find some databases: " ++ unwords missing) :
-            "Searching in:" : map ("  "++) (databases flags) ++ [""] ++
-            (if null n then ["There are no available databases, generate them with: hoogle data"]
-             else ["Either the package does not exist or has not been generated"] ++
-                  ["Generate more databases with: hoogle data all" | length n < 100] ++
-                  ["Found " ++ show (length n) ++ " databases, including: " ++ unwords (take 5 n) | not $ null n])
+    -- unless (null missing) $ do
+    --     n <- availableDatabases (databases flags)
+    --     exitMessage $
+    --         ("Could not find some databases: " ++ unwords missing) :
+    --         "Searching in:" : map ("  "++) (databases flags) ++ [""] ++
+    --         (if null n then ["There are no available databases, generate them with: hoogle data"]
+    --          else ["Either the package does not exist or has not been generated"] ++
+    --               ["Generate more databases with: hoogle data all" | length n < 100] ++
+    --               ["Found " ++ show (length n) ++ " databases, including: " ++ unwords (take 5 n) | not $ null n])
 
     let sug = suggestions dbs q
     when (isJust sug) $

@@ -35,6 +35,7 @@ import qualified Hoogle.Score.All as H
 import qualified Hoogle.Search.All as H
 import qualified Hoogle.Type.All as H
 import qualified Hoogle.Language.Haskell as H
+import qualified Hoogle.Language.Rust as R
 
 import Hoogle.Query.All(Query, exactSearch)
 import Hoogle.Score.All(Score)
@@ -88,12 +89,43 @@ mergeDatabase src out = do
 -- | Load a database from a file. If the database was not saved with the same version of Hoogle,
 --   it will probably throw an error.
 loadDatabase :: FilePath -> IO Database
-loadDatabase x = do db <- H.loadDataBase x; return $ Database [(x, db)]
+loadDatabase x = do 
+  print ("Loading database: " ++ x)
+  db <- H.loadDataBase x
+  return $ Database [(x, db)]
 
 
 defaultDatabaseLocation :: IO FilePath
 defaultDatabaseLocation = getDataDir
 
+
+
+runRust = do
+  examples <- readFile "/Users/tulloch/src/rust/tullochtemp/x/hoogle.json"
+  -- let examples = [
+  --          "add:(int, int) -> int",
+  --          "subtract:(int) -> int",
+  --          "genericAdd:(T, T) -> T",
+  --          "genericOperation:(T, S) -> U"
+  --         ]
+  createDatabase "asdf" H.Rust [] examples "/tmp/rust.hoo"
+  db <- loadDatabase "/tmp/myfile"
+  let Right addQuery = parseQuery H.Rust "(int, int) -> int"
+  let Database [(x, fdb)] = db
+  let matchingType = H.TypeSig [] (H.TFun [H.TApp (H.TLit "(,)") [H.TLit "int", H.TLit "int"], H.TLit "int"])
+  let notMatchingType = H.TypeSig [] (H.TFun [H.TApp (H.TLit "(,)") [H.TLit "apple", H.TLit "berry"], H.TLit "juice"])
+  let test_print prefix operation = do
+            print $ map (const '=') [1..80]
+            print ""
+            print prefix
+            print ""
+            print operation
+  test_print "search-add" $ search db addQuery
+  test_print "search-exact" $ H.searchExactName H.FunctionItem fdb "add"
+  test_print "searchname-add" $ H.searchName fdb "add"
+  test_print "searchType matchingType" $ H.searchType fdb matchingType
+  test_print "searchType notMatchingType" $ H.searchType fdb notMatchingType
+  test_print "H.search addQuery" $ H.search [fdb] addQuery
 
 -- | Create a database from an input definition. Source files for Hoogle databases are usually
 --   stored in UTF8 format, and should be read using 'hSetEncoding' and 'utf8'.
@@ -104,8 +136,24 @@ createDatabase
     -> String -- ^ The input definitions, usually with one definition per line, in a format specified by the 'Language'.
     -> FilePath -- ^ Output file
     -> IO [H.ParseError] -- ^ A list of any parse errors present in the input definition that were skipped.
-createDatabase url _ dbs src out = do
+createDatabase url H.Haskell dbs src out = do
     let (err,res) = H.parseInputHaskell url src
+    let xs = concat [map snd x | Database x <- dbs]
+    let db = H.createDataBase xs res
+    performGC
+    items <- H.saveDataBase out db
+    -- don't build .str for .dep files
+    when (new && takeExtension out == ".hoo") $ do
+        createStr' (newPackage $ takeBaseName out) (map (Pos *** fromOnce) items) (out <.> "str")
+    when (new2 && takeExtension out == ".hoo") $ do
+        items <- fmap (map snd) $ H.saveDataBase (dropExtension out <.> "idx.hoo") $ H.createDataBaseEntries res
+        items <- return $ flip map items $ unsafeFmapOnce $ \e -> e{H.entryLocations = map (first $ const "") $ H.entryLocations e, H.entryName="", H.entryText=mempty, H.entryDocs=mempty}
+        H.saveDataBase (dropExtension out <.> "str.hoo") $ H.createDataBaseText items
+        H.saveDataBase (dropExtension out <.> "typ.hoo") $ H.createDataBaseType xs res items
+        return ()
+    return err
+createDatabase url H.Rust dbs src out = do
+    let (err,res) = R.parseInputRust src
     let xs = concat [map snd x | Database x <- dbs]
     let db = H.createDataBase xs res
     performGC
@@ -132,7 +180,8 @@ showDatabase x sects = concatMap (`H.showDataBase` toDataBase x) $ fromMaybe [""
 
 -- | Parse a query for a given language, returning either a parse error, or a query.
 parseQuery :: H.Language -> String -> Either H.ParseError Query
-parseQuery _ = H.parseQuery
+parseQuery H.Haskell = H.parseQuery
+parseQuery H.Rust = H.parseQueryRust
 
 
 -- Hoogle.Search

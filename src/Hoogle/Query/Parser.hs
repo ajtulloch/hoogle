@@ -1,5 +1,6 @@
+{-# LANGUAGE RecordWildCards #-}
 
-module Hoogle.Query.Parser(parseQuery) where
+module Hoogle.Query.Parser(parseQuery, parseQueryRust) where
 
 import Control.Applicative ((*>))
 import General.Base
@@ -8,6 +9,50 @@ import Hoogle.Type.All as Hoogle
 import Text.ParserCombinators.Parsec hiding (ParseError)
 import qualified Text.ParserCombinators.Parsec as Parsec
 
+parseQueryRust :: String -> Either ParseError Query
+parseQueryRust x = case parse parsecRustQuery "" x of
+        Left err -> Left $ toParseError x err
+        Right x -> Right mempty{typeSig = Just (TypeSig [] x)}
+
+parseRustType :: Parser Type
+parseRustType = do
+  spaces
+  annotation <- optionMaybe (string "&")
+  tystr <- many1 alphaNum
+  parameter <- optionMaybe $ do
+                  string "<"
+                  ty <- parseRustType `sepBy1` (spaces >> string "," >> spaces)
+                  string ">"
+                  return ty
+
+  -- Bit of a hack
+  let ty = if length tystr == 1 && (head tystr `elem` ['A'..'Z'])
+           then TVar tystr
+           else TLit tystr
+  return $ toPrimitiveType ty parameter
+
+toPrimitiveType :: Type -> Maybe [Type] -> Type
+toPrimitiveType ty Nothing = ty
+toPrimitiveType ty (Just parameters) = TApp ty parameters
+
+toType :: [Type] -> Maybe Type -> Type
+toType args Nothing = TApp (TLit "(,)") args
+toType args (Just returnType) = TFun [TApp (TLit "(,)") args, returnType]
+
+-- (a, b) -> c
+-- (int, int) -> in
+-- (&int, &int) -> int
+-- (T, int) -> Vec<T>
+
+parsecRustQuery :: Parser Type
+parsecRustQuery = do
+  spaces
+  string "("
+  arguments <- parseRustType `sepBy1` (spaces >> string "," >> spaces)
+  string ")"
+  spaces
+  returnType <- optionMaybe (string "->" >> parseRustType)
+  return $ toType arguments returnType
 
 parseQuery :: String -> Either ParseError Query
 parseQuery x = case bracketer x of
@@ -85,6 +130,7 @@ parseFlagScope = do
     return mempty{scope=[Scope pm typ $ intercalate "." modu]}
 
 
+keyword :: Parser String
 keyword = do
     x <- letter
     xs <- many $ satisfy $ \x -> isAlphaNum x || x `elem` "_'#-"
