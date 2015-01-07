@@ -36,7 +36,9 @@ toPrimitiveType ty Nothing = ty
 toPrimitiveType ty (Just parameters) = TApp ty parameters
 
 toType :: [Type] -> Maybe Type -> Type
+toType [arg] Nothing = arg
 toType args Nothing = TApp (TLit "(,)") args
+toType [arg] (Just returnType) = TFun [arg, returnType]
 toType args (Just returnType) = TFun [TApp (TLit "(,)") args, returnType]
 
 -- (a, b) -> c
@@ -44,12 +46,24 @@ toType args (Just returnType) = TFun [TApp (TLit "(,)") args, returnType]
 -- (&int, &int) -> int
 -- (T, int) -> Vec<T>
 
-parsecRustQuery :: Parser Type
-parsecRustQuery = do
-  spaces
+parseRustArgumentList :: Parser [Type]
+parseRustArgumentList = do
   string "("
   arguments <- parseRustType `sepBy1` (spaces >> string "," >> spaces)
   string ")"
+  return arguments
+
+
+parseSingleArgument = do
+  spaces
+  ty <- parseRustType
+  spaces
+  return [ty]
+
+parsecRustQuery :: Parser Type
+parsecRustQuery = do
+  spaces
+  arguments <- try parseRustArgumentList <|> parseSingleArgument
   spaces
   returnType <- optionMaybe (string "->" >> parseRustType)
   return $ toType arguments returnType

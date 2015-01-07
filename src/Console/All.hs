@@ -1,24 +1,31 @@
+{-# LANGUAGE RecordWildCards #-}
 
 module Console.All(action) where
 
-import CmdLine.All
-import Recipe.All
-import Recipe.Haddock
-import Console.Log
-import Console.Search
-import Console.Test
-import Console.Rank
-import General.Base
-import General.System
-import General.Web
-import System.FilePath
-import Hoogle
-import Hoogle.Type.All
+import           CmdLine.All
+import           Console.Log
+import           Console.Rank
+import           Console.Search
+import           Console.Test
+import           General.Base
+import           General.System
+import           General.Web
+import           Hoogle
+import           Hoogle.Type.All
+import           Recipe.All
+import           Recipe.Haddock
+import           System.FilePath
 
 
 action :: CmdLine -> IO ()
 
 action x@Search{repeat_=i} | i /= 1 = replicateM_ i $ action x{repeat_=1}
+
+action RustDoc{..} = do
+  jsonFileContents <- mapM readFile jsonFiles
+  errors <- mapM_ (\(fname, contents) -> createDatabase "http://hackageurl" Rust [] contents (fname <.> "hoo")) (zip jsonFiles jsonFileContents)
+  print $ errors
+  mergeDatabase (fmap (\f -> f <.> "hoo") jsonFiles) outfile
 
 action x@Search{queryParsed = Left err} =
     exitMessage ["Parse error:", "  " ++ showTag (parseInput err)
@@ -39,6 +46,8 @@ action (Rank file) = rank file
 action x@Data{} = recipes x
 
 action (Log files) = logFiles files
+
+
 
 action (Convert url from to doc merge haddock) = do
     when (any isUpper $ takeBaseName to) $ putStrLn $ "Warning: Hoogle databases should be all lower case, " ++ takeBaseName to
@@ -86,3 +95,4 @@ convert url deps x out src = do
     err <- createDatabase url Haskell dbs src out
     putStrLn "done"
     unless (null err) $ putStrLn $ "Skipped " ++ show (length err) ++ " warnings in " ++ x
+

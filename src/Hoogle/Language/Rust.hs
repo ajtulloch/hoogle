@@ -1,3 +1,4 @@
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE OverloadedStrings  #-}
@@ -44,6 +45,21 @@ parseApp v@(Array a) =
       ty <- parseRustType ty
       return $ RustApp ty tyArgs
 
+
+canonicalize :: RustType -> RustType
+-- match ("," [a]) -> a, due to functions in rust like:
+-- fn(a) -> b
+canonicalize (RustApp (RustLit "(,)") [singlety]) = singlety
+
+-- if the non-self arguments are empty, don't
+-- fn(&self) -> b ==> self -> b
+canonicalize (RustFn (selfty:RustApp (RustLit "(,)") []:tys)) = RustFn (selfty:tys)
+canonicalize (RustFn args) = RustFn (map canonicalize args)
+canonicalize (RustApp ty args) = RustApp (canonicalize ty) (map canonicalize args)
+canonicalize (RustLit lit) = RustLit lit
+canonicalize (RustVar var) = RustVar var
+
+
 toType :: RustType -> Type
 toType (RustFn args) = TFun (map toType args)
 toType (RustApp ty args) = TApp (toType ty) (map toType args)
@@ -68,14 +84,13 @@ $(deriveFromJSON defaultOptions ''RustEntry)
 $(deriveFromJSON defaultOptions ''RustSignature)
 
 parseInputRust :: String -> ([ParseError], Input)
-parseInputRust content = ([], ([], items))
+parseInputRust content = ([], ([], map rustEntryToItem crate))
     where
-      Just (RustCrate {crate=entries}) = decode (BS.pack content) :: Maybe RustCrate
-      items = map rustEntryToItem entries
+      Just (RustCrate {..}) = decode (BS.pack content) :: Maybe RustCrate
 
 testRust :: IO ()
 testRust = do
-  contents <- BS.readFile "/Users/tulloch/src/tullochtemp/x/hoogle.json"
+  contents <- BS.readFile "/Users/tulloch/src/rust/doc/alloc/arc/hoogle.json"
   print (decode contents :: Maybe RustCrate)
 
 rustEntryToItem :: RustEntry -> TextItem
@@ -92,7 +107,7 @@ rustEntryToItem (RustEntry {name=name, signature=RustSignature{ty=rty}}) =
   itemPriority=2
 }
     where
-      ty = toType rty
+      ty = (toType . canonicalize) rty
       emph = TagBold . Str
       space = Str " "
       bold = TagBold . Str

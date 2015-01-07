@@ -109,6 +109,7 @@ runRust = do
   --          "genericOperation:(T, S) -> U"
   --         ]
   createDatabase "asdf" H.Rust [] examples "/tmp/rust.hoo"
+  createDatabase "asdf" H.Rust [] examples "/tmp/rust.hoo"
   db <- loadDatabase "/tmp/myfile"
   let Right addQuery = parseQuery H.Rust "(int, int) -> int"
   let Database [(x, fdb)] = db
@@ -182,7 +183,6 @@ showDatabase x sects = concatMap (`H.showDataBase` toDataBase x) $ fromMaybe [""
 parseQuery :: H.Language -> String -> Either H.ParseError Query
 parseQuery H.Haskell = H.parseQuery
 parseQuery H.Rust = H.parseQueryRust
-
 
 -- Hoogle.Search
 

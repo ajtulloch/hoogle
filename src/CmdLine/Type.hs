@@ -43,6 +43,7 @@ data CmdLine
         }
     | Server {port :: Int, local_ :: Bool, databases :: [FilePath], resources :: FilePath, dynamic :: Bool, template :: [FilePath]}
     | Combine {srcfiles :: [FilePath], outfile :: String}
+    | RustDoc { jsonFiles :: [FilePath], outfile :: String}
     | Convert {
           hackage :: String
         , srcfile :: String
@@ -59,7 +60,7 @@ data CmdLine
 emptyParseError = ParseError 0 0 "" $ Str ""
 blankSearch = Search False False False False [] Nothing Nothing Nothing 1 [] (Left emptyParseError) ""
 
-cmdLineMode = cmdArgsMode $ modes [search_ &= auto,data_,server,combine,convert,test,dump,rank,log_]
+cmdLineMode = cmdArgsMode $ modes [search_ &= auto,data_,server,combine,convert,test,dump,rank,log_,rustdoc]
     &= verbosity &= program "hoogle"
     &= summary ("Hoogle v" ++ showVersion version ++ ", (C) Neil Mitchell 2004-2012\nhttp://haskell.org/hoogle")
 
@@ -104,6 +105,12 @@ combine = Combine
     {srcfiles = def &= args &= typ "DATABASE"
     ,outfile = "default.hoo" &= typFile &= help "Output file (defaults to default.hoo)"
     } &= help "Combine multiple databases into one"
+
+
+rustdoc = RustDoc
+    {jsonFiles = def &= args &= typ "JSONDOC"
+    ,outfile = "rust.hoo" &= typFile &= help "Output file (defaults to rust.hoo)"
+    } &= help "Combine RustDoc JSON into one"
 
 convert = Convert
     {hackage = "http://hackage.haskell.org/" &= typ "URL" &= help "Hackage instance to target"
