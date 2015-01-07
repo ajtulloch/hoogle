@@ -10,6 +10,10 @@ parse_RustTypeSig :: IO ()
 parse_RustTypeSig = do
     let parseTypeSig x = either Left (Right . fromMaybe (error $ "Couldn't find type in: " ++ x) . typeSig) $ parseQueryRust x
     let (===) = parseTest parseTypeSig
+    "(Vec<T>, int) -> Option<T>" === 
+                    TypeSig [] (TFun [TApp (TLit "(,)") [TApp (TLit "Vec") [TVar "T"], (TLit "int")],
+                                      TApp (TLit "Option") [TVar "T"]
+                                ])
 
     "int -> T" === TypeSig [] (TFun [TLit "int", TVar "T"])
     "(int, int) -> T" === TypeSig [] (TFun [TApp (TLit "(,)") [TLit "int", TLit "int"], TVar "T"])

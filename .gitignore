@@ -5,3 +5,5 @@ cabal.sandbox.config
 /datadir/databases/
 Thumbs.db
 .hub
+/log.txt
+/rust.hoo
