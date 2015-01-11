@@ -26,25 +26,24 @@ typeFromStr tystr = if length tystr == 1 && (head tystr `elem` ['A'..'Z'])
 parseGenericParameters :: Parser [Type]
 parseGenericParameters = 
     between (char '<') (char '>') (parseRustType `sepBy1` spaced (char ','))
+
+
+parseTy :: Type -> Parser Type
+parseTy ty = parseGenericTy ty <|> do
+               return $ ty
+
+parseGenericTy :: Type -> Parser Type
+parseGenericTy ty = do
+  parameters <- parseGenericParameters
+  return $ TApp ty parameters
+         
   
 parseRustType :: Parser Type
 parseRustType = spaced p
     where p = do
             _ <- optionMaybe $ spaced (string "&")
             tystr <- many1 alphaNum
-            parameters <- optionMaybe parseGenericParameters
-            return $ toPrimitiveType (typeFromStr tystr) parameters
-
-toPrimitiveType :: Type -> Maybe [Type] -> Type
-toPrimitiveType ty Nothing = ty
-toPrimitiveType ty (Just parameters) = TApp ty parameters
-
-toTFun :: [Type] -> Type -> Type
-toTFun args retty = TFun $ args ++ [retty]
-
-toTApp :: [Type] -> Type
-toTApp [arg] = arg
-toTApp args = TApp (TLit $ "(" ++ replicate (length args - 1) ',' ++ ")") args
+            parseTy (typeFromStr tystr)
 
 parseRustArgumentList :: Parser [Type]
 parseRustArgumentList = 
@@ -54,16 +53,19 @@ parseSingleArgument = do
   ty <- spaced parseRustType
   return [ty]
 
+parseReturnType args = do
+  string "->"
+  retty <- parseRustType
+  return $ TFun (args ++ [retty])
+
+
 parsecRustQuery :: Parser Type
 parsecRustQuery = do
-  args <- spaced (try parseRustArgumentList <|> parseSingleArgument)
-  retty <- optionMaybe $ do
-                    string "->"
-                    parseRustType
-
-  case retty of
-    Just retty -> return $ toTFun args retty
-    Nothing -> return $ toTApp args
+  args <- spaced (parseRustArgumentList <|> parseSingleArgument)
+  parseReturnType args <|> do (return $ toTApp args)
+      where
+        toTApp [arg] = arg
+        toTApp args = TApp (TLit $ "(" ++ replicate (length args - 1) ',' ++ ")") args
 
 parseQuery :: String -> Either ParseError Query
 parseQuery x = case bracketer x of
