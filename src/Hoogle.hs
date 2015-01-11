@@ -101,7 +101,7 @@ defaultDatabaseLocation = getDataDir
 
 
 runRust = do
-  examples <- readFile "/Users/tulloch/src/rust/tullochtemp/x/hoogle.json"
+  examples <- readFile "/Users/tulloch/src/rust/doc/collections/dlist/hoogle.json"
   -- let examples = [
   --          "add:(int, int) -> int",
   --          "subtract:(int) -> int",
@@ -110,7 +110,7 @@ runRust = do
   --         ]
   createDatabase "asdf" H.Rust [] examples "/tmp/rust.hoo"
   createDatabase "asdf" H.Rust [] examples "/tmp/rust.hoo"
-  db <- loadDatabase "/tmp/myfile"
+  db <- loadDatabase "/tmp/rust.hoo"
   let Right addQuery = parseQuery H.Rust "(int, int) -> int"
   let Database [(x, fdb)] = db
   let matchingType = H.TypeSig [] (H.TFun [H.TApp (H.TLit "(,)") [H.TLit "int", H.TLit "int"], H.TLit "int"])

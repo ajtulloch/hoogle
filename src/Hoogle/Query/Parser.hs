@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Hoogle.Query.Parser(parseQuery, parseQueryRust) where
 
@@ -14,59 +14,56 @@ parseQueryRust x = case parse parsecRustQuery "" x of
         Left err -> Left $ toParseError x err
         Right x -> Right mempty{typeSig = Just (TypeSig [] x)}
 
-parseRustType :: Parser Type
-parseRustType = do
-  spaces
-  annotation <- optionMaybe (string "&")
-  tystr <- many1 alphaNum
-  parameter <- optionMaybe $ do
-                  string "<"
-                  ty <- parseRustType `sepBy1` (spaces >> string "," >> spaces)
-                  string ">"
-                  return ty
+spaced :: Parser a -> Parser a
+spaced = between spaces spaces
 
-  -- Bit of a hack
-  let ty = if length tystr == 1 && (head tystr `elem` ['A'..'Z'])
-           then TVar tystr
-           else TLit tystr
-  return $ toPrimitiveType ty parameter
+-- Bit of a hack
+typeFromStr :: String -> Type
+typeFromStr tystr = if length tystr == 1 && (head tystr `elem` ['A'..'Z'])
+                    then TVar tystr
+                    else TLit tystr
+
+parseGenericParameters :: Parser [Type]
+parseGenericParameters = 
+    between (char '<') (char '>') (parseRustType `sepBy1` spaced (char ','))
+  
+parseRustType :: Parser Type
+parseRustType = spaced p
+    where p = do
+            _ <- optionMaybe $ spaced (string "&")
+            tystr <- many1 alphaNum
+            parameters <- optionMaybe parseGenericParameters
+            return $ toPrimitiveType (typeFromStr tystr) parameters
 
 toPrimitiveType :: Type -> Maybe [Type] -> Type
 toPrimitiveType ty Nothing = ty
 toPrimitiveType ty (Just parameters) = TApp ty parameters
 
-toType :: [Type] -> Maybe Type -> Type
-toType [arg] Nothing = arg
-toType args Nothing = TApp (TLit "(,)") args
-toType [arg] (Just returnType) = TFun [arg, returnType]
-toType args (Just returnType) = TFun [TApp (TLit "(,)") args, returnType]
+toTFun :: [Type] -> Type -> Type
+toTFun args retty = TFun $ args ++ [retty]
 
--- (a, b) -> c
--- (int, int) -> in
--- (&int, &int) -> int
--- (T, int) -> Vec<T>
+toTApp :: [Type] -> Type
+toTApp [arg] = arg
+toTApp args = TApp (TLit $ "(" ++ replicate (length args - 1) ',' ++ ")") args
 
 parseRustArgumentList :: Parser [Type]
-parseRustArgumentList = do
-  string "("
-  arguments <- parseRustType `sepBy1` (spaces >> string "," >> spaces)
-  string ")"
-  return arguments
-
+parseRustArgumentList = 
+    between (char '(') (char ')') (parseRustType `sepBy1` (spaced (char ',')))
 
 parseSingleArgument = do
-  spaces
-  ty <- parseRustType
-  spaces
+  ty <- spaced parseRustType
   return [ty]
 
 parsecRustQuery :: Parser Type
 parsecRustQuery = do
-  spaces
-  arguments <- try parseRustArgumentList <|> parseSingleArgument
-  spaces
-  returnType <- optionMaybe (string "->" >> parseRustType)
-  return $ toType arguments returnType
+  args <- spaced (try parseRustArgumentList <|> parseSingleArgument)
+  retty <- optionMaybe $ do
+                    string "->"
+                    parseRustType
+
+  case retty of
+    Just retty -> return $ toTFun args retty
+    Nothing -> return $ toTApp args
 
 parseQuery :: String -> Either ParseError Query
 parseQuery x = case bracketer x of
@@ -75,14 +72,12 @@ parseQuery x = case bracketer x of
         Left err -> Left $ toParseError x err
         Right x -> Right x
 
-
 toParseError :: String -> Parsec.ParseError -> Hoogle.ParseError
 toParseError src x = parseErrorWith (sourceLine pos) (sourceColumn pos) (show x) src
     where pos = errorPos x
 
 
 ascSymbols = "->!#$%&*+./<=?@\\^|~:"
-
 
 optionBool :: Parser a -> Parser Bool
 optionBool p = (p >> return True) <|> return False

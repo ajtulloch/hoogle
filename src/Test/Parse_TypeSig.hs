@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 
 module Test.Parse_TypeSig(parse_TypeSig, parse_RustTypeSig) where
 
@@ -10,20 +11,23 @@ parse_RustTypeSig :: IO ()
 parse_RustTypeSig = do
     let parseTypeSig x = either Left (Right . fromMaybe (error $ "Couldn't find type in: " ++ x) . typeSig) $ parseQueryRust x
     let (===) = parseTest parseTypeSig
-    "(Vec<T>, int) -> Option<T>" === 
-                    TypeSig [] (TFun [TApp (TLit "(,)") [TApp (TLit "Vec") [TVar "T"], (TLit "int")],
-                                      TApp (TLit "Option") [TVar "T"]
-                                ])
-
+    "(Vec<T>, int) -> Option<T>" === TypeSig [] (TFun [TApp (TLit "Vec") [TVar "T"], TLit "int", TApp (TLit "Option") [TVar "T"]])
     "int -> T" === TypeSig [] (TFun [TLit "int", TVar "T"])
-    "(int, int) -> T" === TypeSig [] (TFun [TApp (TLit "(,)") [TLit "int", TLit "int"], TVar "T"])
-    "(int, int) -> int" === TypeSig [] (TFun [TApp (TLit "(,)") [TLit "int", TLit "int"], TLit "int"])
-    "(T, T) -> S" === TypeSig [] (TFun [TApp (TLit "(,)") [TVar "T", TVar "T"], TVar "S"])
-    "(T, T) -> S" === TypeSig [] (TFun [TApp (TLit "(,)") [TVar "T", TVar "T"], TVar "S"])
-    "(&T, T) -> AS" === TypeSig [] (TFun [TApp (TLit "(,)") [TVar "T", TVar "T"], TLit "AS"])
-    "(&int, &int) -> T" === TypeSig [] (TFun [TApp (TLit "(,)") [TLit "int", TLit "int"], TVar "T"])
-    "(T, int) -> Vec<T>" === TypeSig [] (TFun [TApp (TLit "(,)") [TVar "T", TLit "int"], TApp (TLit "Vec") [TVar "T"]])
-    "(T, int) -> Vec<T, S>" === TypeSig [] (TFun [TApp (TLit "(,)") [TVar "T", TLit "int"], TApp (TLit "Vec") [TVar "T", TVar "S"]])
+
+    -- No return types
+    "(int, T)" === TypeSig [] (TApp (TLit "(,)") [TLit "int", TVar "T"])
+    "(int, T, f64)" === TypeSig [] (TApp (TLit "(,,)") [TLit "int", TVar "T", TLit "f64"])               
+    "int" === TypeSig [] (TLit "int")
+    
+    -- some more complex examples
+    "(int, int) -> T" === TypeSig [] (TFun [TLit "int", TLit "int", TVar "T"])
+    "(int, int) -> int" === TypeSig [] (TFun [TLit "int", TLit "int", TLit "int"])
+    "(int, Vec<T, S>) -> int" === TypeSig [] (TFun [TLit "int", TApp (TLit "Vec") [TVar "T", TVar "S"], TLit "int"])                        
+    "(T, T) -> S" === TypeSig [] (TFun [TVar "T", TVar "T", TVar "S"])
+    "(&T, T) -> AS" === TypeSig [] (TFun [TVar "T", TVar "T", TLit "AS"])
+    "(&int, &int) -> T" === TypeSig [] (TFun [TLit "int", TLit "int", TVar "T"])
+    "(T, int) -> Vec<T>" === TypeSig [] (TFun [TVar "T", TLit "int", TApp (TLit "Vec") [TVar "T"]])
+    "(T, int) -> Vec<T, S>" === TypeSig [] (TFun [TVar "T", TLit "int", TApp (TLit "Vec") [TVar "T", TVar "S"]])
 
 parse_TypeSig :: IO ()
 parse_TypeSig = do
