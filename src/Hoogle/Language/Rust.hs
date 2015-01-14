@@ -13,12 +13,17 @@ import qualified Data.ByteString.Lazy.Char8 as BS
 import qualified Data.Text                  as T
 import qualified Data.Vector                as V
 import           Hoogle.Type.All
-
+import Debug.Trace
+    
 data RustCrate = RustCrate { crate :: [RustEntry] } deriving (Show)
 data RustEntry = RustEntry { name :: String, signature :: RustSignature } deriving (Show)
 data RustSignature = RustSignature {ty :: RustType } deriving (Show)
 
-data RustType = RustFn [RustType] | RustApp RustType [RustType] | RustLit String | RustVar String deriving (Show)
+data RustType = RustFn [RustType] 
+              | RustApp RustType [RustType]
+              | RustLit String
+              | RustVar String
+                deriving (Show)
 
 parseVar :: Value -> Parser RustType
 parseVar v@(Array a) =
@@ -47,17 +52,19 @@ parseApp v@(Array a) =
 
 
 canonicalize :: RustType -> RustType
+canonicalize = id
+
 -- match ("," [a]) -> a, due to functions in rust like:
 -- fn(a) -> b
-canonicalize (RustApp (RustLit "(,)") [singlety]) = singlety
+-- canonicalize (RustApp (RustLit "(,)") [singlety]) = singlety
 
--- if the non-self arguments are empty, don't
--- fn(&self) -> b ==> self -> b
-canonicalize (RustFn (selfty:RustApp (RustLit "(,)") []:tys)) = RustFn (selfty:tys)
-canonicalize (RustFn args) = RustFn (map canonicalize args)
-canonicalize (RustApp ty args) = RustApp (canonicalize ty) (map canonicalize args)
-canonicalize (RustLit lit) = RustLit lit
-canonicalize (RustVar var) = RustVar var
+-- -- if the non-self arguments are empty, don't
+-- -- fn(&self) -> b ==> self -> b
+-- canonicalize (RustFn (selfty:RustApp (RustLit "(,)") []:tys)) = RustFn (selfty:tys)
+-- canonicalize (RustFn args) = RustFn (map canonicalize args)
+-- canonicalize (RustApp ty args) = RustApp (canonicalize ty) (map canonicalize args)
+-- canonicalize (RustLit lit) = RustLit lit
+-- canonicalize (RustVar var) = RustVar var
 
 
 toType :: RustType -> Type
@@ -107,7 +114,8 @@ rustEntryToItem (RustEntry {name=name, signature=RustSignature{ty=rty}}) =
   itemPriority=2
 }
     where
-      ty = (toType . canonicalize) rty
+      ty = trace ("Got item: " ++  name ++ " :: " ++ show aty) aty
+      aty = (toType . canonicalize) rty
       emph = TagBold . Str
       space = Str " "
       bold = TagBold . Str

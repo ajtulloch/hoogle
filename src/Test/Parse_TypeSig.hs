@@ -10,24 +10,24 @@ import Hoogle.Query.All
 parse_RustTypeSig :: IO ()
 parse_RustTypeSig = do
     let parseTypeSig x = either Left (Right . fromMaybe (error $ "Couldn't find type in: " ++ x) . typeSig) $ parseQueryRust x
-    let (===) = parseTest parseTypeSig
-    "(Vec<T>, int) -> Option<T>" === TypeSig [] (TFun [TApp (TLit "Vec") [TVar "T"], TLit "int", TApp (TLit "Option") [TVar "T"]])
-    "int -> T" === TypeSig [] (TFun [TLit "int", TVar "T"])
+    let lhs === rhs = parseTest parseTypeSig lhs (TypeSig [] rhs)
+    "(Vec<T>, int) -> Option<T>" === TFun [TApp (TLit "Vec") [TVar "T"], TLit "int", TApp (TLit "Option") [TVar "T"]]
+    "int -> T" === TFun [TLit "int", TVar "T"]
 
     -- No return types
-    "(int, T)" === TypeSig [] (TApp (TLit "(,)") [TLit "int", TVar "T"])
-    "(int, T, f64)" === TypeSig [] (TApp (TLit "(,,)") [TLit "int", TVar "T", TLit "f64"])               
-    "int" === TypeSig [] (TLit "int")
-    
+    "(int, T)" === TApp (TLit "(,)") [TLit "int", TVar "T"]
+    "(int, T, f64)" === TApp (TLit "(,,)") [TLit "int", TVar "T", TLit "f64"]
+    "int" === TLit "int"
+
     -- some more complex examples
-    "(int, int) -> T" === TypeSig [] (TFun [TLit "int", TLit "int", TVar "T"])
-    "(int, int) -> int" === TypeSig [] (TFun [TLit "int", TLit "int", TLit "int"])
-    "(int, Vec<T, S>) -> int" === TypeSig [] (TFun [TLit "int", TApp (TLit "Vec") [TVar "T", TVar "S"], TLit "int"])                        
-    "(T, T) -> S" === TypeSig [] (TFun [TVar "T", TVar "T", TVar "S"])
-    "(&T, T) -> AS" === TypeSig [] (TFun [TVar "T", TVar "T", TLit "AS"])
-    "(&int, &int) -> T" === TypeSig [] (TFun [TLit "int", TLit "int", TVar "T"])
-    "(T, int) -> Vec<T>" === TypeSig [] (TFun [TVar "T", TLit "int", TApp (TLit "Vec") [TVar "T"]])
-    "(T, int) -> Vec<T, S>" === TypeSig [] (TFun [TVar "T", TLit "int", TApp (TLit "Vec") [TVar "T", TVar "S"]])
+    "(int, int) -> T" === TFun [TLit "int", TLit "int", TVar "T"]
+    "(int, int) -> int" === TFun [TLit "int", TLit "int", TLit "int"]
+    "(int, Vec<T, S>) -> int" === TFun [TLit "int", TApp (TLit "Vec") [TVar "T", TVar "S"], TLit "int"]
+    "(T, T) -> S" === TFun [TVar "T", TVar "T", TVar "S"]
+    "(&T, T) -> AS" === TFun [TVar "T", TVar "T", TLit "AS"]
+    "(&int, &int) -> T" === TFun [TLit "int", TLit "int", TVar "T"]
+    "(T, int) -> Vec<T>" === TFun [TVar "T", TLit "int", TApp (TLit "Vec") [TVar "T"]]
+    "(T, int) -> Vec<T, S>" === TFun [TVar "T", TLit "int", TApp (TLit "Vec") [TVar "T", TVar "S"]]
 
 parse_TypeSig :: IO ()
 parse_TypeSig = do

@@ -19,35 +19,27 @@ spaced = between spaces spaces
 
 -- Bit of a hack
 typeFromStr :: String -> Type
-typeFromStr tystr = if length tystr == 1 && (head tystr `elem` ['A'..'Z'])
-                    then TVar tystr
-                    else TLit tystr
+typeFromStr tystr = if tystr `elem` fmap (: []) ['A'..'Z'] then TVar tystr else TLit tystr
 
 parseGenericParameters :: Parser [Type]
 parseGenericParameters = 
     between (char '<') (char '>') (parseRustType `sepBy1` spaced (char ','))
 
-
-parseTy :: Type -> Parser Type
-parseTy ty = parseGenericTy ty <|> do
-               return $ ty
-
 parseGenericTy :: Type -> Parser Type
 parseGenericTy ty = do
   parameters <- parseGenericParameters
   return $ TApp ty parameters
-         
   
 parseRustType :: Parser Type
-parseRustType = spaced p
-    where p = do
-            _ <- optionMaybe $ spaced (string "&")
-            tystr <- many1 alphaNum
-            parseTy (typeFromStr tystr)
+parseRustType = spaced $ do
+                  many $ spaced (string "&" <|> string "mut")
+                  tystr <- many1 alphaNum
+                  let ty = (typeFromStr tystr)
+                  parseGenericTy ty <|> return ty                    
 
 parseRustArgumentList :: Parser [Type]
 parseRustArgumentList = 
-    between (char '(') (char ')') (parseRustType `sepBy1` (spaced (char ',')))
+    between (char '(') (char ')') (parseRustType `sepBy1` spaced (char ','))
 
 parseSingleArgument = do
   ty <- spaced parseRustType
@@ -62,7 +54,7 @@ parseReturnType args = do
 parsecRustQuery :: Parser Type
 parsecRustQuery = do
   args <- spaced (parseRustArgumentList <|> parseSingleArgument)
-  parseReturnType args <|> do (return $ toTApp args)
+  parseReturnType args <|> return (toTApp args)
       where
         toTApp [arg] = arg
         toTApp args = TApp (TLit $ "(" ++ replicate (length args - 1) ',' ++ ")") args
